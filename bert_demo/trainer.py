@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 # %matplotlib inline
 
 # 加载数据并设置标签
-from src.bert_model import BertClassifier
+from bert_demo.bert_model import BertClassifier
 
 data_complaint = pd.read_csv('/Users/weijinqian/PycharmProjects/bert_demo/data/complaint1700.csv')
 data_complaint['label'] = 0
