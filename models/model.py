@@ -17,8 +17,8 @@ from models.modules import *
 class DFNet(nn.Module):
     def __init__(self, hidden_size, lang, max_resp_len, path, lr, n_layers, dropout, domains=None):
         super(DFNet, self).__init__()
-        self.input_size = lang.n_words
-        self.output_size = lang.n_words
+        self.input_size = len(lang.tokenizer)
+        self.output_size = len(lang.tokenizer)
         self.hidden_size = hidden_size
         self.lang = lang
         self.lr = lr
@@ -41,8 +41,8 @@ class DFNet(nn.Module):
                 self.extKnow = torch.load(str(path) + '/enc_kb.th', lambda storage, loc: storage)
                 self.decoder = torch.load(str(path) + '/dec.th', lambda storage, loc: storage)
         else:
-            self.encoder = ContextEncoder(lang.n_words, hidden_size, dropout, domains)
-            self.extKnow = ExternalKnowledge(lang.n_words, hidden_size, n_layers, dropout)
+            self.encoder = ContextEncoder(lang, hidden_size, dropout, domains)
+            self.extKnow = ExternalKnowledge(lang, hidden_size, n_layers, dropout)
             self.decoder = LocalMemoryDecoder(self.encoder.bert_embedding, 768, lang, hidden_size, self.decoder_hop,
                                               dropout, domains=domains)
 

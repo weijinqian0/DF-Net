@@ -155,7 +155,7 @@ def prepare_data_seq(batch_size=100):
     print("Read %s sentence pairs train" % len(pair_train))
     print("Read %s sentence pairs dev" % len(pair_dev))
     print("Read %s sentence pairs test" % len(pair_test))
-    print("Vocab_size: %s " % lang.n_words)
+    print("Vocab_size: %s " % len(lang.tokenizer))
     print("Max. length of system response: %s " % max_resp_len)
     print("USE_CUDA={}".format(USE_CUDA))
 

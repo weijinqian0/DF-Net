@@ -3,7 +3,7 @@ import argparse
 from tqdm import tqdm
 
 PAD_token = 1
-SOS_token = 3
+SOS_token = 102
 EOS_token = 2
 UNK_token = 0
 

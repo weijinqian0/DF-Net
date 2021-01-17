@@ -32,7 +32,6 @@ class Lang:
              'eos_token': '[EOS]'})
         # self.word2index = {}
         # self.index2word = {PAD_token: "PAD", SOS_token: "SOS", EOS_token: "EOS", UNK_token: 'UNK'}
-        self.n_words = self.tokenizer.vocab_size  # Count default tokens
         # self.word2index = dict([(v, k) for k, v in self.index2word.items()])
         #
         self.char2index = {}

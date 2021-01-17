@@ -169,9 +169,9 @@ class MLPSelfAttention(nn.Module):
 
 
 class ContextEncoder(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout, domains, n_layers=args['layer_r']):
+    def __init__(self, lang, hidden_size, dropout, domains, n_layers=args['layer_r']):
         super(ContextEncoder, self).__init__()
-        self.input_size = input_size
+        self.input_size = len(lang.tokenizer)
         self.hidden_size = hidden_size
         self.n_layers = n_layers
         self.domains = domains
@@ -180,7 +180,7 @@ class ContextEncoder(nn.Module):
         self.dropout = dropout
         self.dropout_layer = nn.Dropout(dropout)
         self.bert_embedding = BertModel.from_pretrained('bert-base-uncased')
-        self.bert_embedding.resize_token_embeddings(input_size)
+        self.bert_embedding.resize_token_embeddings(self.input_size)
         # self.embedding = nn.Embedding(input_size, args['embeddings_dim'], padding_idx=PAD_token)
         self.odim = args['embeddings_dim']
         self.global_gru = RNN_Residual(self.odim, hidden_size, n_layers, dropout=dropout)
@@ -234,14 +234,14 @@ class ContextEncoder(nn.Module):
 
 
 class ExternalKnowledge(nn.Module):
-    def __init__(self, vocab, embedding_dim, hop, dropout):
+    def __init__(self, lang, embedding_dim, hop, dropout):
         super(ExternalKnowledge, self).__init__()
         self.max_hops = hop
         self.embedding_dim = embedding_dim
         self.dropout = dropout
         self.dropout_layer = nn.Dropout(dropout)
         for hop in range(self.max_hops + 1):
-            C = nn.Embedding(vocab, embedding_dim, padding_idx=PAD_token)
+            C = nn.Embedding(len(lang.tokenizer), embedding_dim, padding_idx=PAD_token)
             C.weight.data.normal_(0, 0.1)
             self.add_module("C_{}".format(hop), C)
         self.C = AttrProxy(self, "C_")
@@ -317,7 +317,7 @@ class ExternalKnowledge(nn.Module):
 class LocalMemoryDecoder(nn.Module):
     def __init__(self, shared_emb, embedding_dim, lang, hidden_dim, hop, dropout, domains=None):
         super(LocalMemoryDecoder, self).__init__()
-        self.num_vocab = lang.n_words
+        self.num_vocab = len(lang.tokenizer)
         self.lang = lang
         self.max_hops = hop
         self.bert_embedding = shared_emb
@@ -359,7 +359,9 @@ class LocalMemoryDecoder(nn.Module):
         cond = F.softmax(cond.squeeze(-1), dim=-1)
         hidden_ = cond.unsqueeze(-1).expand_as(H).mul(H).sum(-2)
         context = F.tanh(self.projector2(torch.cat((hidden.squeeze(0), hidden_), dim=-1).unsqueeze(0)))
-        p_vocab = self.attend_vocab(self.bert_embedding.weight, context.squeeze(0))
+        p_vocab = self.attend_vocab(
+            self.bert_embedding(torch.tensor(list(self.lang.tokenizer.vocab.values())[0:2]).view(-1, 1))[0].squeeze(1),
+            context.squeeze(0))
         return p_vocab, context
 
     def forward(self, extKnow, story_size, story_lengths, copy_list, encode_hidden, target_batches, max_target_length,
@@ -368,8 +370,8 @@ class LocalMemoryDecoder(nn.Module):
         # Initialize variables for vocab and pointer
         all_decoder_outputs_vocab = _cuda(torch.zeros(max_target_length, batch_size, self.num_vocab))
         all_decoder_outputs_ptr = _cuda(torch.zeros(max_target_length, batch_size, story_size[1]))
-        decoder_input = _cuda(self.domain_emb(domains.view(-1, ))) + self.bert_embedding(
-            _cuda(torch.LongTensor([SOS_token] * batch_size)))
+        decoder_input = _cuda(self.domain_emb(domains.view(-1, ))) + \
+                        self.bert_embedding(_cuda(torch.LongTensor([SOS_token] * batch_size).view(batch_size, -1)))[1]
         memory_mask_for_step = _cuda(torch.ones(story_size[0], story_size[1]))
         decoded_fine, decoded_coarse = [], []
         hidden = self.relu(self.projector(encode_hidden)).unsqueeze(0)
