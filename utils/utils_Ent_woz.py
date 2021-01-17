@@ -128,10 +128,10 @@ def generate_memory(sent, speaker, time):
     sent_token = sent.split(' ')
     if speaker == "$u" or speaker == "$s":
         for idx, word in enumerate(sent_token):
-            temp = [word, speaker, 'turn' + str(time), 'word' + str(idx)] + ["PAD"] * (MEM_TOKEN_SIZE - 4)
+            temp = [word, speaker, 'turn' + str(time), 'word' + str(idx)]
             sent_new.append(temp)
     else:
-        sent_token = sent_token[::-1] + ["PAD"] * (MEM_TOKEN_SIZE - len(sent_token))
+        sent_token = sent_token[::-1]
         sent_new.append(sent_token)
     return sent_new
 

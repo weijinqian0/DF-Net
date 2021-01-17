@@ -2,6 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from transformers import BertModel
+
 from utils.config import *
 from utils.utils_general import _cuda
 import math
@@ -167,7 +169,7 @@ class MLPSelfAttention(nn.Module):
 
 
 class ContextEncoder(nn.Module):
-    def __init__(self, input_size, hidden_size, dropout, vocab_size, domains, n_layers=args['layer_r']):
+    def __init__(self, input_size, hidden_size, dropout, domains, n_layers=args['layer_r']):
         super(ContextEncoder, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
@@ -177,7 +179,9 @@ class ContextEncoder(nn.Module):
         self.mix_attention_c = MLPSelfAttention(len(domains) * 2 * self.hidden_size, len(domains), dropout)
         self.dropout = dropout
         self.dropout_layer = nn.Dropout(dropout)
-        self.embedding = nn.Embedding(input_size, args['embeddings_dim'], padding_idx=PAD_token)
+        self.bert_embedding = BertModel.from_pretrained('bert-base-uncased')
+        self.bert_embedding.resize_token_embeddings(input_size)
+        # self.embedding = nn.Embedding(input_size, args['embeddings_dim'], padding_idx=PAD_token)
         self.odim = args['embeddings_dim']
         self.global_gru = RNN_Residual(self.odim, hidden_size, n_layers, dropout=dropout)
         self.selfatten = SelfAttention(2 * self.hidden_size, dropout=self.dropout)
@@ -202,7 +206,7 @@ class ContextEncoder(nn.Module):
 
     def forward(self, input_seqs, input_lengths, conv_char_arr, conv_char_length, char_seq_recover, domain_arr,
                 hidden=None):
-        embedded = self.embedding(input_seqs.contiguous().view(input_seqs.size(0), -1).long())
+        embedded = self.bert_embedding(input_ids=input_seqs.contiguous().view(input_seqs.size(0), -1).long())[0]
         embedded = embedded.view(input_seqs.size() + (embedded.size(-1),))
         embedded = torch.sum(embedded, 2).squeeze(2)
         embedded = self.dropout_layer(embedded.transpose(0, 1))
@@ -311,13 +315,13 @@ class ExternalKnowledge(nn.Module):
 
 
 class LocalMemoryDecoder(nn.Module):
-    def __init__(self, shared_emb, lang, hidden_dim, hop, dropout, domains=None):
+    def __init__(self, shared_emb, embedding_dim, lang, hidden_dim, hop, dropout, domains=None):
         super(LocalMemoryDecoder, self).__init__()
         self.num_vocab = lang.n_words
         self.lang = lang
         self.max_hops = hop
-        self.C = shared_emb
-        self.embedding_dim = shared_emb.embedding_dim
+        self.bert_embedding = shared_emb
+        self.embedding_dim = embedding_dim
         self.dropout = dropout
         self.dropout_layer = nn.Dropout(dropout)
         self.softmax = nn.Softmax(dim=1)
@@ -355,7 +359,7 @@ class LocalMemoryDecoder(nn.Module):
         cond = F.softmax(cond.squeeze(-1), dim=-1)
         hidden_ = cond.unsqueeze(-1).expand_as(H).mul(H).sum(-2)
         context = F.tanh(self.projector2(torch.cat((hidden.squeeze(0), hidden_), dim=-1).unsqueeze(0)))
-        p_vocab = self.attend_vocab(self.C.weight, context.squeeze(0))
+        p_vocab = self.attend_vocab(self.bert_embedding.weight, context.squeeze(0))
         return p_vocab, context
 
     def forward(self, extKnow, story_size, story_lengths, copy_list, encode_hidden, target_batches, max_target_length,
@@ -364,7 +368,7 @@ class LocalMemoryDecoder(nn.Module):
         # Initialize variables for vocab and pointer
         all_decoder_outputs_vocab = _cuda(torch.zeros(max_target_length, batch_size, self.num_vocab))
         all_decoder_outputs_ptr = _cuda(torch.zeros(max_target_length, batch_size, story_size[1]))
-        decoder_input = _cuda(self.domain_emb(domains.view(-1, ))) + self.C(
+        decoder_input = _cuda(self.domain_emb(domains.view(-1, ))) + self.bert_embedding(
             _cuda(torch.LongTensor([SOS_token] * batch_size)))
         memory_mask_for_step = _cuda(torch.ones(story_size[0], story_size[1]))
         decoded_fine, decoded_coarse = [], []
@@ -380,7 +384,7 @@ class LocalMemoryDecoder(nn.Module):
         # Start to generate word-by-word
         for t in range(max_target_length):
             if t != 0:
-                decoder_input = self.C(decoder_input)
+                decoder_input = self.bert_embedding(decoder_input)
             embed_q = self.dropout_layer(decoder_input)
             if len(embed_q.size()) == 2: embed_q = embed_q.unsqueeze(0)
 

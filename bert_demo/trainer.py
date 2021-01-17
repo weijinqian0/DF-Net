@@ -10,9 +10,9 @@ import matplotlib.pyplot as plt
 # 加载数据并设置标签
 from bert_demo.bert_model import BertClassifier
 
-data_complaint = pd.read_csv('/Users/weijinqian/PycharmProjects/bert_demo/data/complaint1700.csv')
+data_complaint = pd.read_csv('/Users/weijinqian/Documents/nlp/DF-Net/bert_demo/data/complaint1700.csv')
 data_complaint['label'] = 0
-data_non_complaint = pd.read_csv('/Users/weijinqian/PycharmProjects/bert_demo/data/noncomplaint1700.csv')
+data_non_complaint = pd.read_csv('/Users/weijinqian/Documents/nlp/DF-Net/bert_demo/data/noncomplaint1700.csv')
 data_non_complaint['label'] = 1
 
 # 将抱怨和不抱怨的两个数据合成一块
@@ -32,7 +32,7 @@ y = data['label'].values
 X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, random_state=2020)
 
 # Load test data
-test_data = pd.read_csv('/Users/weijinqian/PycharmProjects/bert_demo/data/test_data.csv')
+test_data = pd.read_csv('/Users/weijinqian/Documents/nlp/DF-Net/bert_demo/data/test_data.csv')
 
 # Keep important columns
 test_data = test_data[['id', 'tweet']]
@@ -71,7 +71,7 @@ def text_preprocessing(text):
     return text
 
 
-from transformers import BertTokenizer
+from transformers import BertTokenizer, BertModel
 
 # 加载 BERT tokenizer
 tokenizer = BertTokenizer.from_pretrained('bert-base-uncased', do_lower_case=True)
@@ -95,7 +95,7 @@ def preprocessing_for_bert(data):
             text=text_preprocessing(sent),  # 调用上面创建的略微预处理文本的函数
             add_special_tokens=True,  # Add `[CLS]` and `[SEP]`
             max_length=MAX_LEN,  # 指定max_length（后面会指定）
-            padding='max_length',  # 补长 padding
+            pad_to_max_length=True,  # 补长 padding
             # return_tensors='pt',           # Return PyTorch tensor 是否返回PyTorch张量
             return_attention_mask=True,  # Return attention mask
             truncation=True  # 截短

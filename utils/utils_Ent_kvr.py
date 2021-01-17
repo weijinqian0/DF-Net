@@ -140,10 +140,11 @@ def generate_memory(sent, speaker, time):
     sent_token = sent.split(' ')
     if speaker == "$u" or speaker == "$s":
         for idx, word in enumerate(sent_token):
-            temp = [word, speaker, 'turn' + str(time), 'word' + str(idx)] + ["PAD"] * (MEM_TOKEN_SIZE - 4)
+            # 修改特殊字符
+            temp = [word, speaker, 'turn' + str(time), 'word' + str(idx)]
             sent_new.append(temp)
     else:
-        sent_token = sent_token[::-1] + ["PAD"] * (MEM_TOKEN_SIZE - len(sent_token))
+        sent_token = sent_token[::-1]
         sent_new.append(sent_token)
     return sent_new
 
@@ -167,7 +168,7 @@ def prepare_data_seq(batch_size=100):
     print("Read %s sentence pairs train" % len(pair_train))
     print("Read %s sentence pairs dev" % len(pair_dev))
     print("Read %s sentence pairs test" % len(pair_test))
-    print("Vocab_size: %s " % lang.n_words)
+    # print("Vocab_size: %s " % lang.n_words)
     print("Max. length of system response: %s " % max_resp_len)
     print("USE_CUDA={}".format(USE_CUDA))
 

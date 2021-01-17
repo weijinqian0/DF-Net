@@ -41,9 +41,9 @@ class DFNet(nn.Module):
                 self.extKnow = torch.load(str(path) + '/enc_kb.th', lambda storage, loc: storage)
                 self.decoder = torch.load(str(path) + '/dec.th', lambda storage, loc: storage)
         else:
-            self.encoder = ContextEncoder(lang.n_words, hidden_size, dropout, lang.n_chars, domains)
+            self.encoder = ContextEncoder(lang.n_words, hidden_size, dropout, domains)
             self.extKnow = ExternalKnowledge(lang.n_words, hidden_size, n_layers, dropout)
-            self.decoder = LocalMemoryDecoder(self.encoder.embedding, lang, hidden_size, self.decoder_hop,
+            self.decoder = LocalMemoryDecoder(self.encoder.bert_embedding, 768, lang, hidden_size, self.decoder_hop,
                                               dropout, domains=domains)
 
         # Initialize optimizers and criterion
