@@ -4,7 +4,7 @@ from tqdm import tqdm
 
 PAD_token = 1
 SOS_token = 102
-EOS_token = 2
+EOS_token = 102
 UNK_token = 0
 
 parser = argparse.ArgumentParser(description='DF-Net')

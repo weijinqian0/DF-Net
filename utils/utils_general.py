@@ -71,6 +71,15 @@ class Lang:
         else:
             return self.tokenizer.added_tokens_decoder[index]
 
+    def word2index(self, word):
+        # 使用bert的词典进行index翻译
+        if word in self.tokenizer.vocab:
+            return self.tokenizer.vocab[word]
+        elif word in self.tokenizer.added_tokens_encoder:
+            return self.tokenizer.added_tokens_encoder[word]
+        else:
+            return self.tokenizer.vocab['[unused0]']
+
 
 class Dataset(data.Dataset):
     """Custom data.Dataset compatible with data.DataLoader."""
@@ -125,7 +134,7 @@ class Dataset(data.Dataset):
     def preprocess(self, sequence, trg=True, char=False):
         """Converts words to ids."""
         if trg:
-            story = self.lang.tokenizer.encode(sequence)
+            story = [self.lang.word2index(word) for word in sequence.split(' ')] + [EOS_token]
         elif char:
             length = torch.Tensor([len(word[0]) for word in sequence])
             char_arr = []
@@ -137,8 +146,10 @@ class Dataset(data.Dataset):
         else:
             story = []
             for i, word_triple in enumerate(sequence):
-                story.append(self.lang.tokenizer.encode(' '.join(word_triple), max_length=MEM_TOKEN_SIZE,
-                                                        pad_to_max_length=True))
+                story.append([])
+                for ii, word in enumerate(word_triple):
+                    temp = self.lang.word2index(word)
+                    story[i].append(temp)
         story = torch.Tensor(story)
         return story
 

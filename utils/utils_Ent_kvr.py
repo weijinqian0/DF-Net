@@ -141,10 +141,10 @@ def generate_memory(sent, speaker, time):
     if speaker == "$u" or speaker == "$s":
         for idx, word in enumerate(sent_token):
             # 修改特殊字符
-            temp = [word, speaker, 'turn' + str(time), 'word' + str(idx)]
+            temp = [word, speaker, 'turn' + str(time), 'word' + str(idx)] + ['[PAD]'] * (MEM_TOKEN_SIZE - 4)
             sent_new.append(temp)
     else:
-        sent_token = sent_token[::-1]
+        sent_token = sent_token[::-1] + ["[PAD]"] * (MEM_TOKEN_SIZE - len(sent_token))
         sent_new.append(sent_token)
     return sent_new
 
