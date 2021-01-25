@@ -43,7 +43,7 @@ class DFNet(nn.Module):
         else:
             self.encoder = ContextEncoder(lang, hidden_size, dropout, domains)
             self.extKnow = ExternalKnowledge(lang, hidden_size, n_layers, dropout)
-            self.decoder = LocalMemoryDecoder(self.encoder.bert_embedding, 768, lang, hidden_size, self.decoder_hop,
+            self.decoder = LocalMemoryDecoder(self.encoder.bert_embedding, args['embeddings_dim'], lang, hidden_size, self.decoder_hop,
                                               dropout, domains=domains)
 
         # Initialize optimizers and criterion

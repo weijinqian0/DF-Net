@@ -30,6 +30,8 @@ class Lang:
         self.tokenizer.add_special_tokens(
             {'additional_special_tokens': ['poi', '$$$$', '$u', '$s', '@poi', '@poi_type', 'dentist_ap'] + entity,
              'eos_token': '[EOS]'})
+        # 保存数据集中的词典信息
+        self.data_words_set = set()
         # self.word2index = {}
         # self.index2word = {PAD_token: "PAD", SOS_token: "SOS", EOS_token: "EOS", UNK_token: 'UNK'}
         # self.word2index = dict([(v, k) for k, v in self.index2word.items()])
@@ -49,13 +51,25 @@ class Lang:
                     self.index_word(word)
 
     def index_word(self, word):
-        if word not in self.tokenizer.vocab and (word.__contains__('_') or bool(re.search(r'\d', word))):
-            self.tokenizer.add_special_tokens({'additional_special_tokens': [word]})
+        if word not in self.tokenizer.vocab:
+            if word.__contains__('_') or bool(re.search(r'\d', word)):
+                self.data_words_set.add(word)
+                self.tokenizer.add_special_tokens({'additional_special_tokens': [word]})
+        else:
+            self.data_words_set.add(word)
+
         for char in word:
             if char not in self.char2index:
                 self.char2index[char] = self.n_chars
                 self.index2char[self.n_chars] = char
                 self.n_chars += 1
+
+    def index2word(self, index):
+        # 使用bert的词典进行index翻译
+        if index in self.tokenizer.ids_to_tokens:
+            return self.tokenizer.ids_to_tokens[index]
+        else:
+            return self.tokenizer.added_tokens_decoder[index]
 
 
 class Dataset(data.Dataset):

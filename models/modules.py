@@ -4,6 +4,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from transformers import BertModel
 
+from utils.bert_model import BertEmbedding
 from utils.config import *
 from utils.utils_general import _cuda
 import math
@@ -179,8 +180,7 @@ class ContextEncoder(nn.Module):
         self.mix_attention_c = MLPSelfAttention(len(domains) * 2 * self.hidden_size, len(domains), dropout)
         self.dropout = dropout
         self.dropout_layer = nn.Dropout(dropout)
-        self.bert_embedding = BertModel.from_pretrained('bert-base-uncased')
-        self.bert_embedding.resize_token_embeddings(self.input_size)
+        self.bert_embedding = BertEmbedding(lang.tokenizer)
         # self.embedding = nn.Embedding(input_size, args['embeddings_dim'], padding_idx=PAD_token)
         self.odim = args['embeddings_dim']
         self.global_gru = RNN_Residual(self.odim, hidden_size, n_layers, dropout=dropout)
@@ -206,7 +206,7 @@ class ContextEncoder(nn.Module):
 
     def forward(self, input_seqs, input_lengths, conv_char_arr, conv_char_length, char_seq_recover, domain_arr,
                 hidden=None):
-        embedded = self.bert_embedding(input_ids=input_seqs.contiguous().view(input_seqs.size(0), -1).long())[0]
+        embedded = self.bert_embedding(input_ids=input_seqs.contiguous().view(input_seqs.size(0), -1).long())
         embedded = embedded.view(input_seqs.size() + (embedded.size(-1),))
         embedded = torch.sum(embedded, 2).squeeze(2)
         embedded = self.dropout_layer(embedded.transpose(0, 1))
@@ -359,10 +359,21 @@ class LocalMemoryDecoder(nn.Module):
         cond = F.softmax(cond.squeeze(-1), dim=-1)
         hidden_ = cond.unsqueeze(-1).expand_as(H).mul(H).sum(-2)
         context = F.tanh(self.projector2(torch.cat((hidden.squeeze(0), hidden_), dim=-1).unsqueeze(0)))
+        indexes = []
+        for word in self.lang.data_words_set:
+            if word in self.lang.tokenizer.vocab:
+                indexes.append(self.lang.tokenizer.vocab[word])
+            elif word in self.lang.tokenizer.added_tokens_encoder:
+                indexes.append(self.lang.tokenizer.added_tokens_encoder[word])
+
         p_vocab = self.attend_vocab(
-            self.bert_embedding(torch.tensor(list(self.lang.tokenizer.vocab.values())[0:2]).view(-1, 1))[0].squeeze(1),
+            self.bert_embedding(torch.tensor(indexes).view(-1, 1)).squeeze(1),
             context.squeeze(0))
-        return p_vocab, context
+        result = _cuda(torch.zeros(p_vocab.shape[0], self.num_vocab))
+        for batch in range(p_vocab.shape[0]):
+            for p, index in zip(p_vocab[batch], indexes):
+                result[batch][index] = p
+        return result, context
 
     def forward(self, extKnow, story_size, story_lengths, copy_list, encode_hidden, target_batches, max_target_length,
                 batch_size, use_teacher_forcing, get_decoded_words, global_pointer, H=None, global_entity_type=None,
@@ -371,7 +382,7 @@ class LocalMemoryDecoder(nn.Module):
         all_decoder_outputs_vocab = _cuda(torch.zeros(max_target_length, batch_size, self.num_vocab))
         all_decoder_outputs_ptr = _cuda(torch.zeros(max_target_length, batch_size, story_size[1]))
         decoder_input = _cuda(self.domain_emb(domains.view(-1, ))) + \
-                        self.bert_embedding(_cuda(torch.LongTensor([SOS_token] * batch_size).view(batch_size, -1)))[1]
+                        self.bert_embedding(_cuda(torch.LongTensor([SOS_token] * batch_size).view(batch_size, -1)))
         memory_mask_for_step = _cuda(torch.ones(story_size[0], story_size[1]))
         decoded_fine, decoded_coarse = [], []
         hidden = self.relu(self.projector(encode_hidden)).unsqueeze(0)
@@ -386,9 +397,10 @@ class LocalMemoryDecoder(nn.Module):
         # Start to generate word-by-word
         for t in range(max_target_length):
             if t != 0:
-                decoder_input = self.bert_embedding(decoder_input)
+                decoder_input = self.bert_embedding(decoder_input.view(1, -1))
             embed_q = self.dropout_layer(decoder_input)
-            if len(embed_q.size()) == 2: embed_q = embed_q.unsqueeze(0)
+            if len(embed_q.size()) == 2:
+                embed_q = embed_q.unsqueeze(0)
 
             _, hidden = self.sketch_rnn_global(embed_q, hidden)
             hidden_locals_ = []
@@ -419,6 +431,7 @@ class LocalMemoryDecoder(nn.Module):
                 decoder_input = topvi.squeeze()
 
             if get_decoded_words:
+                # 这里主要是为了获取输出的单词的
 
                 search_len = min(5, min(story_lengths))
                 prob_soft = prob_soft * memory_mask_for_step
@@ -427,10 +440,10 @@ class LocalMemoryDecoder(nn.Module):
 
                 for bi in range(batch_size):
                     token = topvi[bi].item()
-                    temp_c.append(self.lang.index2word[token])
+                    temp_c.append(self.lang.index2word(token))
 
-                    if '@' in self.lang.index2word[token]:
-                        gold_type = self.lang.index2word[token]
+                    if '@' in self.lang.index2word(token):
+                        gold_type = self.lang.index2word(token)
                         cw = 'UNK'
                         for i in range(search_len):
                             if toppi[:, i][bi] < story_lengths[bi] - 1:
@@ -441,7 +454,7 @@ class LocalMemoryDecoder(nn.Module):
                         if args['record']:
                             memory_mask_for_step[bi, toppi[:, i][bi].item()] = 0
                     else:
-                        temp_f.append(self.lang.index2word[token])
+                        temp_f.append(self.lang.index2word(token))
 
                 decoded_fine.append(temp_f)
                 decoded_coarse.append(temp_c)

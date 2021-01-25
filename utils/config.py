@@ -13,7 +13,7 @@ parser.add_argument('-ds', '--dataset', help='dataset, kvr or woz', required=Fal
 parser.add_argument('-e', '--epoch', help='epoch num', required=False, type=int, default=1000)
 parser.add_argument('-fixed', '--fixed', help='fix seeds', required=False, default=False)
 parser.add_argument('-random_seed', '--random_seed', help='random_seed', required=False, default=1234)
-parser.add_argument('-em_dim', '--embeddings_dim', help='word embeddings dim', type=int, required=False, default=768)
+parser.add_argument('-em_dim', '--embeddings_dim', help='word embeddings dim', type=int, required=False, default=128)
 parser.add_argument('-hdd', '--hidden', help='Hidden size', required=False, default=128)
 parser.add_argument('-bsz', '--batch', help='Batch_size', type=int, required=False, default=16)
 parser.add_argument('-lr', '--learn', help='Learning Rate', required=False, default=0.001)
