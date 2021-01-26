@@ -367,7 +367,7 @@ class LocalMemoryDecoder(nn.Module):
                 indexes.append(self.lang.tokenizer.added_tokens_encoder[word])
 
         p_vocab = self.attend_vocab(
-            self.bert_embedding(torch.tensor(indexes).view(-1, 1)).squeeze(1),
+            self.bert_embedding(_cuda(torch.tensor(indexes).view(-1, 1))).squeeze(1),
             context.squeeze(0))
         result = _cuda(torch.zeros(p_vocab.shape[0], self.num_vocab))
         for batch in range(p_vocab.shape[0]):
