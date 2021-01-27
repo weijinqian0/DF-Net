@@ -360,15 +360,20 @@ class LocalMemoryDecoder(nn.Module):
         hidden_ = cond.unsqueeze(-1).expand_as(H).mul(H).sum(-2)
         context = F.tanh(self.projector2(torch.cat((hidden.squeeze(0), hidden_), dim=-1).unsqueeze(0)))
         indexes = []
+        cur_tensor = _cuda(torch.Tensor())
         for word in self.lang.data_words_set:
             if word in self.lang.tokenizer.vocab:
-                indexes.append(self.lang.tokenizer.vocab[word])
+                index = self.lang.tokenizer.vocab[word]
+                indexes.append(index)
+                cur_tensor = torch.cat(
+                    (cur_tensor, self.bert_embedding(_cuda(torch.tensor(index).view(-1, 1))).squeeze(1)), 0)
             elif word in self.lang.tokenizer.added_tokens_encoder:
-                indexes.append(self.lang.tokenizer.added_tokens_encoder[word])
+                index = self.lang.tokenizer.added_tokens_encoder[word]
+                indexes.append(index)
+                cur_tensor = torch.cat(
+                    (cur_tensor, self.bert_embedding(_cuda(torch.tensor(index).view(-1, 1))).squeeze(1)), 0)
 
-        p_vocab = self.attend_vocab(
-            self.bert_embedding(_cuda(torch.tensor(indexes).view(-1, 1))).squeeze(1),
-            context.squeeze(0))
+        p_vocab = self.attend_vocab(cur_tensor, context.squeeze(0))
         result = _cuda(torch.zeros(p_vocab.shape[0], self.num_vocab))
         for batch in range(p_vocab.shape[0]):
             for p, index in zip(p_vocab[batch], indexes):
