@@ -354,31 +354,17 @@ class LocalMemoryDecoder(nn.Module):
         self.global_classifier = nn.Sequential(GradientReversal(),
                                                CNNClassifier(hidden_dim, hidden_dim, [2, 3], len(domains), dropout))
 
-    def get_p_vocab(self, hidden, H):
+    def get_p_vocab(self, hidden, H, vocab_tensor, indexes, container):
         cond = self.attn_table(torch.cat((H, hidden.squeeze(0).unsqueeze(1).expand_as(H)), dim=-1))
         cond = F.softmax(cond.squeeze(-1), dim=-1)
         hidden_ = cond.unsqueeze(-1).expand_as(H).mul(H).sum(-2)
         context = F.tanh(self.projector2(torch.cat((hidden.squeeze(0), hidden_), dim=-1).unsqueeze(0)))
-        indexes = []
-        cur_tensor = _cuda(torch.Tensor())
-        for word in self.lang.data_words_set:
-            if word in self.lang.tokenizer.vocab:
-                index = self.lang.tokenizer.vocab[word]
-                indexes.append(index)
-                cur_tensor = torch.cat(
-                    (cur_tensor, self.bert_embedding(_cuda(torch.tensor(index).view(-1, 1))).squeeze(1)), 0)
-            elif word in self.lang.tokenizer.added_tokens_encoder:
-                index = self.lang.tokenizer.added_tokens_encoder[word]
-                indexes.append(index)
-                cur_tensor = torch.cat(
-                    (cur_tensor, self.bert_embedding(_cuda(torch.tensor(index).view(-1, 1))).squeeze(1)), 0)
 
-        p_vocab = self.attend_vocab(cur_tensor, context.squeeze(0))
-        result = _cuda(torch.zeros(p_vocab.shape[0], self.num_vocab))
+        p_vocab = self.attend_vocab(vocab_tensor, context.squeeze(0)).contiguous()
         for batch in range(p_vocab.shape[0]):
             for p, index in zip(p_vocab[batch], indexes):
-                result[batch][index] = p
-        return result, context
+                container[batch][index] = p
+        return container, context
 
     def forward(self, extKnow, story_size, story_lengths, copy_list, encode_hidden, target_batches, max_target_length,
                 batch_size, use_teacher_forcing, get_decoded_words, global_pointer, H=None, global_entity_type=None,
@@ -399,6 +385,15 @@ class LocalMemoryDecoder(nn.Module):
         global_hiddens = []
         local_hiddens = []
         scores = []
+
+        indexes = []
+        for word in self.lang.data_words_set:
+            index = self.lang.word2index(word)
+            indexes.append(index)
+
+        vocab_tensor = self.bert_embedding(_cuda(torch.tensor(indexes, requires_grad=False).view(-1, 1))).squeeze(1).contiguous()
+        container = _cuda(torch.zeros(batch_size, self.num_vocab)).contiguous()
+
         # Start to generate word-by-word
         for t in range(max_target_length):
             if t != 0:
@@ -421,7 +416,7 @@ class LocalMemoryDecoder(nn.Module):
             global_hiddens.append(hidden)
             local_hiddens.append(hidden_local)
 
-            p_vocab, context = self.get_p_vocab(query_vector[0], H)
+            p_vocab, context = self.get_p_vocab(query_vector[0], H, vocab_tensor, indexes, container)
 
             all_decoder_outputs_vocab[t] = p_vocab
             _, topvi = p_vocab.data.topk(1)
