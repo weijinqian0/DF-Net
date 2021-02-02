@@ -15,7 +15,7 @@ parser.add_argument('-fixed', '--fixed', help='fix seeds', required=False, defau
 parser.add_argument('-random_seed', '--random_seed', help='random_seed', required=False, default=1234)
 parser.add_argument('-em_dim', '--embeddings_dim', help='word embeddings dim', type=int, required=False, default=128)
 parser.add_argument('-hdd', '--hidden', help='Hidden size', required=False, default=128)
-parser.add_argument('-bsz', '--batch', help='Batch_size', type=int, required=False, default=16)
+parser.add_argument('-bsz', '--batch', help='Batch_size', type=int, required=False, default=8)
 parser.add_argument('-lr', '--learn', help='Learning Rate', required=False, default=0.001)
 parser.add_argument('-dr', '--drop', help='Drop Out', required=False, default=0.2)
 parser.add_argument('-um', '--unk_mask', help='mask out input token to UNK', type=int, required=False, default=1)
